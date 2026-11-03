@@ -1,0 +1,98 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { TextEdit } from "std-widgets.slint";
+import { Theme, AppI18n, LayoutConstants } from "../../theme.slint";
+import { CustomButton } from "../form_widgets.slint";
+
+export component DockerLogDialog inherits Rectangle {
+    in property <string> container_name;
+    in property <string> logs;
+    in property <string> error;
+    in property <string> notice;
+    in property <bool> busy;
+    callback close();
+    callback refresh();
+    callback copy_text(string);
+    background: #00000070;
+    TouchArea { clicked => { root.close(); } }
+    keys := FocusScope {
+        init => { self.focus(); }
+        key-pressed(event) => {
+            if event.text == Key.Escape { root.close(); return accept; }
+            return reject;
+        }
+        Rectangle {
+            x: 24px;
+            y: 32px;
+            width: parent.width - 48px;
+            height: parent.height - 64px;
+            background: Theme.card_bg;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: Theme.border_color;
+            TouchArea { }
+            VerticalLayout {
+                padding: 16px;
+                spacing: 10px;
+                HorizontalLayout {
+                    spacing: 8px;
+                    Text {
+                        text: AppI18n.t("docker.logs", [AppI18n.version]) + " · " + root.container_name;
+                        color: Theme.text_primary;
+                        font-family: Theme.default_font;
+                        font-size: 15px * LayoutConstants.font-scale;
+                        font-weight: 600;
+                        horizontal-stretch: 1;
+                        min-width: 0px;
+                        overflow: elide;
+                        vertical-alignment: center;
+                    }
+                    CustomButton {
+                        text: AppI18n.t("docker.close", [AppI18n.version]);
+                        clicked => { root.close(); }
+                    }
+                }
+                if root.error != "": TextEdit {
+                    height: 72px;
+                    text: root.error;
+                    read-only: true;
+                    wrap: word-wrap;
+                }
+                TextEdit {
+                    text: root.logs;
+                    font-family: "Consolas";
+                    font-size: 12px * LayoutConstants.font-scale;
+                    read-only: true;
+                    wrap: no-wrap;
+                    vertical-stretch: 1;
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    Text {
+                        text: root.busy ? AppI18n.t("docker.loading_logs", [AppI18n.version]) :
+                            root.notice != "" ? root.notice :
+                            root.logs == "" && root.error == "" ? AppI18n.t("docker.no_logs", [AppI18n.version]) : "";
+                        color: Theme.text_secondary;
+                        font-family: Theme.default_font;
+                        font-size: 12px * LayoutConstants.font-scale;
+                        horizontal-stretch: 1;
+                        min-width: 0px;
+                        overflow: elide;
+                        vertical-alignment: center;
+                    }
+                    CustomButton {
+                        text: AppI18n.t("docker.copy_all", [AppI18n.version]);
+                        enabled: root.logs != "";
+                        clicked => { root.copy_text(root.logs); }
+                    }
+                    CustomButton {
+                        text: AppI18n.t("docker.refresh", [AppI18n.version]);
+                        enabled: !root.busy;
+                        clicked => { root.refresh(); }
+                    }
+                }
+            }
+        }
+    }
+}

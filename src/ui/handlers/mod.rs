@@ -16,6 +16,7 @@ pub mod mail;
 pub mod scheduler;
 pub mod mount_disk;
 pub mod shortcut;
+pub mod docker;
 
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -36,4 +37,5 @@ pub async fn setup(app: &AppWindow, app_handle: slint::Weak<AppWindow>, app_stat
     scheduler::setup(app, app_handle.clone(), app_state.clone());
     mount_disk::setup(app, app_handle.clone(), app_state.clone());
     shortcut::setup(app, app_handle.clone(), app_state.clone());
+    docker::setup(app, app_handle.clone());
 }

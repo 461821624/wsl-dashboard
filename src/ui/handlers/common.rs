@@ -72,6 +72,10 @@ pub fn setup(app: &AppWindow, app_handle: slint::Weak<AppWindow>, app_state: Arc
             if tab == 8 {
                 super::about::trigger_fetch(ah.clone(), as_ptr.clone());
             }
+
+            if tab == 9 && !app.get_docker_initialized() {
+                app.invoke_refresh_docker();
+            }
         }
     });
 

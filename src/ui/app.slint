@@ -21,6 +21,7 @@ import {
     PhysicalDiskInfo,
     MountedDiskInfo,
     ShortcutRow,
+    DockerContainer,
 } from "theme.slint";
 import { AppConstants } from "constants.slint";
 import { TitleBar } from "components/title_bar.slint";
@@ -34,14 +35,17 @@ import { NetworkView } from "views/network/mod.slint";
 import { SchedulerView } from "views/scheduler_view.slint";
 import { SchedulerDialog } from "components/dialogs/scheduler_dialog.slint";
 import { MountDiskView } from "views/mount_disk_view.slint";
+import { DockerView } from "views/docker_view.slint";
+import { DockerLogDialog } from "components/dialogs/docker_log_dialog.slint";
 import { MountDiskDialog } from "components/dialogs/mount_disk_dialog.slint";
 import { SettingsView } from "views/settings/mod.slint";
 import { AboutView } from "views/about_view.slint";
 import { DonateView } from "views/donate_view.slint";
 import { TaskStatusToast } from "components/task_status_toast.slint";
+import { Palette } from "std-widgets.slint";
 
 
-export { Theme, Distro, InstallableDistro, AppInfo, RootFSHelpItem, UsbDevice, PortProxyRuleUI, AppI18n, AppApi, PhysicalDiskInfo, MountedDiskInfo }
+export { Theme, Distro, InstallableDistro, AppInfo, RootFSHelpItem, UsbDevice, PortProxyRuleUI, AppI18n, AppApi, PhysicalDiskInfo, MountedDiskInfo, DockerContainer }
 
 export component AppWindow inherits Window {
     title: "WSL_DASHBOARD_WINDOW_UI";
@@ -50,11 +54,42 @@ export component AppWindow inherits Window {
     height: 600px;
     background: transparent;
     no-frame: true;
+    property <bool> native_dark_mode: Theme.dark_mode;
+    changed native_dark_mode => {
+        Palette.color-scheme = root.native_dark_mode ? ColorScheme.dark : ColorScheme.light;
+    }
 
     // --- Backend API State (Keep these here for Rust integration) ---
     in property <[Distro]> distros: [];
     in property <[InstallableDistro]> installable_distros: [];
     in property <int> selected_tab: 0;
+    in property <[DockerContainer]> docker_containers: [];
+    in property <[DockerContainer]> docker_filtered_containers: [];
+    in-out property <string> docker_query: "";
+    in-out property <int> docker_filter: 0;
+    in-out property <length> docker_scroll_y: 0px;
+    in-out property <string> docker_expanded_id: "";
+    in property <string> docker_busy_id: "";
+    in property <string> docker_operation: "";
+    in property <string> docker_notice: "";
+    in-out property <bool> show_docker_logs: false;
+    in property <string> docker_log_id: "";
+    in property <string> docker_log_error: "";
+    in property <[string]> docker_targets: ["Docker Desktop"];
+    in property <int> docker_target_index: 0;
+    in property <bool> docker_initialized: false;
+    in property <bool> docker_busy: false;
+    in-out property <bool> docker_as_root: false;
+    in property <string> docker_status: "";
+    in property <string> docker_error: "";
+    in property <string> docker_logs: "";
+    in property <string> docker_log_title: "";
+    callback refresh_docker();
+    callback select_docker_target(int);
+    callback set_docker_root(bool);
+    callback docker_action(string, string);
+    callback filter_docker();
+    callback copy_docker_text(string);
     in-out property <bool> auto_shutdown: false;
     in-out property <bool> tray_autostart: false;
     in-out property <bool> tray_start_minimized: false;
@@ -590,6 +625,7 @@ export component AppWindow inherits Window {
     }
     init => {
         Theme.default_font = root.get-font(root.ui_language);
+        Palette.color-scheme = root.native_dark_mode ? ColorScheme.dark : ColorScheme.light;
     }
 
 
@@ -947,6 +983,32 @@ export component AppWindow inherits Window {
                                 mount_disk(path) => {
                                     root.mount_disk_mount_from_list(path);
                                 }
+                            }
+
+                            DockerView {
+                                visible: selected_tab == 9;
+                                z: 10;
+                                targets: root.docker_targets;
+                                target_index: root.docker_target_index;
+                                containers: root.docker_filtered_containers;
+                                total_count: root.docker_containers.length;
+                                query <=> root.docker_query;
+                                state_filter <=> root.docker_filter;
+                                scroll_y <=> root.docker_scroll_y;
+                                expanded_id <=> root.docker_expanded_id;
+                                busy: root.docker_busy;
+                                busy_id: root.docker_busy_id;
+                                operation: root.docker_operation;
+                                notice: root.docker_notice;
+                                as_root <=> root.docker_as_root;
+                                status: root.docker_status;
+                                error: root.docker_error;
+                                refresh => { root.refresh_docker(); }
+                                filter_changed => { root.filter_docker(); }
+                                copy_text(text) => { root.copy_docker_text(text); }
+                                select_target(index) => { root.select_docker_target(index); }
+                                set_root(enabled) => { root.set_docker_root(enabled); }
+                                action(action, id) => { root.docker_action(action, id); }
                             }
 
                             DonateView {
@@ -1619,6 +1681,18 @@ export component AppWindow inherits Window {
         close => {
             root.close_task_status();
         }
+    }
+
+    if root.show_docker_logs: DockerLogDialog {
+        z: 1000;
+        container_name: root.docker_log_title;
+        logs: root.docker_logs;
+        error: root.docker_log_error;
+        notice: root.docker_notice;
+        busy: root.docker_busy;
+        close => { root.show_docker_logs = false; }
+        refresh => { root.docker_action("logs", root.docker_log_id); }
+        copy_text(text) => { root.copy_docker_text(text); }
     }
 
     // Shortcut recording: during recording the window focus is handed to this FocusScope, which passes captured keys to Rust

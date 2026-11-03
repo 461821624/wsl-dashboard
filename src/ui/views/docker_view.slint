@@ -1,0 +1,165 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 owu <wqh@live.com>
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { TextEdit } from "std-widgets.slint";
+import { Theme, AppI18n, LayoutConstants, DockerContainer } from "../theme.slint";
+import { CustomButton, CustomComboBox, CustomCheckBox, CustomLineEdit } from "../components/form_widgets.slint";
+import { CustomScrollbar } from "../components/scrollbar.slint";
+import { DockerContainerCard } from "../components/docker_container_card.slint";
+
+export component DockerView inherits Rectangle {
+    in property <[string]> targets;
+    in property <int> target_index;
+    in property <[DockerContainer]> containers;
+    in property <int> total_count;
+    in property <bool> busy;
+    in property <string> busy_id;
+    in property <string> operation;
+    in property <string> notice;
+    in-out property <bool> as_root: false;
+    in-out property <string> query;
+    in-out property <int> state_filter: 0;
+    in-out property <length> scroll_y: 0px;
+    in-out property <string> expanded_id;
+    in property <string> status;
+    in property <string> error;
+    callback refresh();
+    callback select_target(int);
+    callback set_root(bool);
+    callback action(string, string);
+    callback filter_changed();
+    callback copy_text(string);
+
+    changed target_index => { environment_selector.current-index = root.target_index; }
+
+    VerticalLayout {
+        spacing: 8px;
+        padding-right: 12px;
+        HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: AppI18n.t("docker.environment", [AppI18n.version]);
+                color: Theme.text_primary;
+                font-family: Theme.default_font;
+                font-size: 13px * LayoutConstants.font-scale;
+                vertical-alignment: center;
+            }
+            environment_selector := CustomComboBox {
+                horizontal-stretch: 1;
+                model: root.targets;
+                current-index: root.target_index;
+                enabled: !root.busy;
+                selected(index) => { root.select_target(index); }
+            }
+            CustomButton {
+                text: AppI18n.t("docker.refresh", [AppI18n.version]);
+                enabled: !root.busy;
+                clicked => { root.refresh(); }
+            }
+        }
+        HorizontalLayout {
+            spacing: 12px;
+            if root.target_index > 0: CustomCheckBox {
+                text: AppI18n.t("docker.as_root", [AppI18n.version]);
+                checked <=> root.as_root;
+                enabled: !root.busy;
+                toggled => { root.set_root(root.as_root); }
+            }
+            Text {
+                text: root.busy && root.operation != "" ? root.operation : root.status;
+                color: root.busy ? Theme.accent : root.error != "" ? Theme.icon_color_warning : Theme.icon_color_success;
+                font-family: Theme.default_font;
+                font-size: 12px * LayoutConstants.font-scale;
+                horizontal-stretch: 1;
+                min-width: 0px;
+                overflow: elide;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+            }
+        }
+        Text {
+            text: AppI18n.t(root.as_root ? "docker.root_warning" : "docker.environment_hint", [AppI18n.version]);
+            color: Theme.text_secondary;
+            font-family: Theme.default_font;
+            font-size: 11px * LayoutConstants.font-scale;
+            wrap: word-wrap;
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            CustomLineEdit {
+                horizontal-stretch: 1;
+                text <=> root.query;
+                placeholder-text: AppI18n.t("docker.search", [AppI18n.version]);
+                edited(text) => { root.filter_changed(); }
+            }
+            CustomComboBox {
+                width: 140px;
+                model: [
+                    AppI18n.t("docker.filter_all", [AppI18n.version]),
+                    AppI18n.t("docker.state_running", [AppI18n.version]),
+                    AppI18n.t("docker.state_exited", [AppI18n.version]),
+                ];
+                current-index <=> root.state_filter;
+                selected(index) => { root.filter_changed(); }
+            }
+        }
+        if root.notice != "": Text {
+            text: root.notice;
+            color: Theme.text_secondary;
+            font-family: Theme.default_font;
+            font-size: 12px * LayoutConstants.font-scale;
+            wrap: word-wrap;
+        }
+        if root.error != "": TextEdit {
+            height: 80px;
+            text: root.error;
+            read-only: true;
+            wrap: word-wrap;
+        }
+        Rectangle {
+            vertical-stretch: 1;
+            clip: true;
+            flick := Flickable {
+                width: parent.width - 12px;
+                height: parent.height;
+                viewport-width: self.width;
+                viewport-height: rows.preferred-height;
+                viewport-y <=> root.scroll_y;
+                rows := VerticalLayout {
+                    width: parent.width;
+                    padding: 0px;
+                    spacing: 8px;
+                    for container in root.containers: DockerContainerCard {
+                        container: container;
+                        enabled: !root.busy && root.error == "";
+                        expanded: root.expanded_id == container.id;
+                        operation: root.busy_id == container.id ? root.operation : "";
+                        action(action, id) => { root.action(action, id); }
+                        toggle_details => {
+                            root.expanded_id = root.expanded_id == container.id ? "" : container.id;
+                        }
+                        copy_text(text) => { root.copy_text(text); }
+                    }
+                    if root.containers.length == 0 && !root.busy && root.error == "": Text {
+                        text: AppI18n.t(root.total_count == 0 ? "docker.no_containers" : "docker.no_results", [AppI18n.version]);
+                        color: Theme.text_secondary;
+                        font-family: Theme.default_font;
+                        font-size: 13px * LayoutConstants.font-scale;
+                        horizontal-alignment: center;
+                        height: 60px;
+                    }
+                }
+            }
+            CustomScrollbar {
+                visible: flick.viewport-height > flick.height;
+                x: parent.width - 8px;
+                width: 8px;
+                height: 100%;
+                maximum: max(0px, flick.viewport-height - flick.height);
+                page_size: flick.height;
+                value: -flick.viewport-y;
+                scroll_to(v) => { flick.viewport-y = -v; }
+            }
+        }
+    }
+}

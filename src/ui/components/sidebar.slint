@@ -140,6 +140,14 @@ export component Sidebar inherits Rectangle {
                 root.tab_selected(5);
             }
         }
+        SidebarItem {
+            icon: "\u{E7B8}";
+            icon_type: "sky";
+            text: "Docker";
+            selected: selected_tab == 9;
+            collapsed: root.collapsed;
+            clicked => { root.tab_selected(9); }
+        }
         Rectangle {
             vertical-stretch: 1;
         } // Spacer: Pushes everything below it to the bottom

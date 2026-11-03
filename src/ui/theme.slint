@@ -3,6 +3,15 @@
 
 import { AppConstants } from "constants.slint";
 
+export struct DockerContainer {
+    id: string,
+    name: string,
+    image: string,
+    state: string,
+    status: string,
+    ports: string,
+}
+
 export global AppApi {
     in-out property <bool> show_drag: true;
     pure callback make-transfer(int) -> data-transfer;
