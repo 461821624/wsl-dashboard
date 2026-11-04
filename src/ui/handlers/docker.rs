@@ -5,6 +5,9 @@ use crate::docker::{Container, Target, matches_filter};
 use crate::{AppWindow, DockerContainer, i18n};
 use slint::{Model, ModelRc, VecModel};
 
+#[path = "docker/resources.rs"]
+mod resources;
+
 fn selected_target(app: &AppWindow) -> Option<Target> {
     let index = usize::try_from(app.get_docker_target_index()).ok()?;
     if index == 0 {
@@ -17,6 +20,28 @@ fn selected_target(app: &AppWindow) -> Option<Target> {
     })
 }
 
+pub fn set_pull_sources(app: &AppWindow, mut sources: Vec<String>, current: String) {
+    if !current.is_empty() && !sources.contains(&current) {
+        sources.push(current.clone());
+    }
+    let index = if current.is_empty() {
+        0
+    } else {
+        sources
+            .iter()
+            .position(|source| source == &current)
+            .map(|i| i + 1)
+            .unwrap_or(0)
+    };
+    let mut choices = vec![slint::SharedString::from(i18n::t(
+        "docker.default_pull_source",
+    ))];
+    choices.extend(sources.into_iter().map(slint::SharedString::from));
+    app.set_docker_pull_sources(ModelRc::new(VecModel::from(choices)));
+    app.set_docker_pull_source_index(index as i32);
+    app.set_docker_saved_pull_source(current.into());
+}
+
 fn filter_list(app: &AppWindow) {
     let query = app.get_docker_query();
     let filter = app.get_docker_filter();
@@ -26,6 +51,7 @@ fn filter_list(app: &AppWindow) {
         .filter(|c| matches_filter(&c.name, &c.image, &c.state, &query, filter))
         .collect::<Vec<_>>();
     app.set_docker_filtered_containers(ModelRc::new(VecModel::from(rows)));
+    resources::filter_list(app);
 }
 
 fn clear_context(app: &AppWindow) {
@@ -41,6 +67,16 @@ fn clear_context(app: &AppWindow) {
     app.set_docker_log_title("".into());
     app.set_docker_log_error("".into());
     app.set_docker_notice("".into());
+    app.set_docker_resources(ModelRc::default());
+    app.set_docker_filtered_resources(ModelRc::default());
+    app.set_docker_pull_reference("".into());
+    app.set_docker_pull_target("".into());
+    app.set_docker_pull_error("".into());
+    app.set_docker_log_auto(false);
+    app.set_docker_log_kind("logs".into());
+    app.set_show_docker_confirm(false);
+    app.set_docker_pending_action("".into());
+    app.set_docker_pending_id("".into());
 }
 
 fn finish_request(app: &AppWindow) {
@@ -80,7 +116,12 @@ fn apply_list(app: &AppWindow, result: Result<(String, Vec<Container>), String>)
     finish_request(app);
 }
 
-pub fn setup(app: &AppWindow, app_handle: slint::Weak<AppWindow>) {
+pub fn setup(
+    app: &AppWindow,
+    app_handle: slint::Weak<AppWindow>,
+    app_state: std::sync::Arc<tokio::sync::Mutex<crate::AppState>>,
+) {
+    resources::setup(app, app_handle.clone(), app_state);
     let ah = app_handle.clone();
     app.on_filter_docker(move || {
         if let Some(app) = ah.upgrade() {
@@ -145,6 +186,10 @@ pub fn setup(app: &AppWindow, app_handle: slint::Weak<AppWindow>) {
         app.set_docker_error("".into());
         app.set_docker_notice("".into());
         app.set_docker_status(i18n::t("docker.loading").into());
+        if app.get_docker_section() != 0 {
+            resources::refresh(&app, ah.clone(), target);
+            return;
+        }
         let ah = ah.clone();
         tokio::spawn(async move {
             let result = target.list().await;
@@ -198,6 +243,7 @@ pub fn setup(app: &AppWindow, app_handle: slint::Weak<AppWindow>) {
             "stop" => "docker.stopping",
             "restart" => "docker.restarting",
             "logs" => "docker.loading_logs",
+            "stats" if container.state == "running" => "docker.loading",
             _ => return,
         };
         let Some(target) = selected_target(&app) else {
@@ -207,10 +253,15 @@ pub fn setup(app: &AppWindow, app_handle: slint::Weak<AppWindow>) {
         app.set_docker_busy_id(id.clone());
         app.set_docker_operation(i18n::t(operation).into());
         app.set_docker_notice("".into());
-        if action == "logs" {
-            if app.get_docker_log_id() != id {
+        if action == "logs" || action == "stats" {
+            if app.get_docker_log_id() != id
+                || app.get_docker_log_kind() != action
+                || !app.get_show_docker_logs()
+            {
                 app.set_docker_logs("".into());
+                app.set_docker_log_auto(action == "stats");
             }
+            app.set_docker_log_kind(action.clone());
             app.set_docker_log_id(id.clone());
             app.set_docker_log_title(container.name.clone());
             app.set_docker_log_error("".into());
@@ -218,8 +269,12 @@ pub fn setup(app: &AppWindow, app_handle: slint::Weak<AppWindow>) {
         }
         let ah = ah.clone();
         tokio::spawn(async move {
-            let result = target.action(&action, &id).await;
-            let list = if action != "logs" && result.is_ok() {
+            let result = if action == "stats" {
+                target.stats(&id).await
+            } else {
+                target.action(&action, &id).await
+            };
+            let list = if action != "logs" && action != "stats" && result.is_ok() {
                 Some(target.list().await)
             } else {
                 None
@@ -242,8 +297,9 @@ pub fn setup(app: &AppWindow, app_handle: slint::Weak<AppWindow>) {
                         finish_request(&app);
                         match result {
                             Ok(logs) => app.set_docker_logs(logs.into()),
-                            Err(error) if action == "logs" => {
-                                app.set_docker_log_error(error.into())
+                            Err(error) if action == "logs" || action == "stats" => {
+                                app.set_docker_log_error(error.into());
+                                app.set_docker_log_auto(false);
                             }
                             Err(error) => app.set_docker_error(error.into()),
                         }

@@ -3,7 +3,7 @@
 
 import { TextEdit } from "std-widgets.slint";
 import { Theme, AppI18n, LayoutConstants } from "../../theme.slint";
-import { CustomButton } from "../form_widgets.slint";
+import { CustomButton, CustomCheckBox } from "../form_widgets.slint";
 
 export component DockerLogDialog inherits Rectangle {
     in property <string> container_name;
@@ -11,10 +11,18 @@ export component DockerLogDialog inherits Rectangle {
     in property <string> error;
     in property <string> notice;
     in property <bool> busy;
+    in property <string> kind: "logs";
+    in-out property <bool> auto_refresh: false;
+    in property <bool> polling_active: true;
     callback close();
     callback refresh();
     callback copy_text(string);
     background: #00000070;
+    Timer {
+        interval: 3s;
+        running: root.auto_refresh && root.polling_active && !root.busy && root.error == "";
+        triggered => { root.refresh(); }
+    }
     TouchArea { clicked => { root.close(); } }
     keys := FocusScope {
         init => { self.focus(); }
@@ -38,7 +46,7 @@ export component DockerLogDialog inherits Rectangle {
                 HorizontalLayout {
                     spacing: 8px;
                     Text {
-                        text: AppI18n.t("docker.logs", [AppI18n.version]) + " · " + root.container_name;
+                        text: AppI18n.t(root.kind == "stats" ? "docker.monitor" : "docker.logs", [AppI18n.version]) + " · " + root.container_name;
                         color: Theme.text_primary;
                         font-family: Theme.default_font;
                         font-size: 15px * LayoutConstants.font-scale;
@@ -67,10 +75,14 @@ export component DockerLogDialog inherits Rectangle {
                     wrap: no-wrap;
                     vertical-stretch: 1;
                 }
+                CustomCheckBox {
+                    text: AppI18n.t(root.kind == "stats" ? "docker.auto_refresh_stats" : "docker.auto_refresh", [AppI18n.version]);
+                    checked <=> root.auto_refresh;
+                }
                 HorizontalLayout {
                     spacing: 8px;
                     Text {
-                        text: root.busy ? AppI18n.t("docker.loading_logs", [AppI18n.version]) :
+                        text: root.busy ? AppI18n.t("docker.loading", [AppI18n.version]) :
                             root.notice != "" ? root.notice :
                             root.logs == "" && root.error == "" ? AppI18n.t("docker.no_logs", [AppI18n.version]) : "";
                         color: Theme.text_secondary;
@@ -82,7 +94,7 @@ export component DockerLogDialog inherits Rectangle {
                         vertical-alignment: center;
                     }
                     CustomButton {
-                        text: AppI18n.t("docker.copy_all", [AppI18n.version]);
+                        text: AppI18n.t("docker.copy", [AppI18n.version]);
                         enabled: root.logs != "";
                         clicked => { root.copy_text(root.logs); }
                     }

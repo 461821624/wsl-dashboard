@@ -3,10 +3,14 @@
 
 import { Theme, AppI18n } from "../theme.slint";
 import { SidebarItem } from "common.slint";
+import { CustomScrollbar } from "scrollbar.slint";
 
 export component Sidebar inherits Rectangle {
     in-out property <bool> collapsed: false;
     in property <int> selected_tab: 0;
+    in property <int> docker_section: 0;
+    in property <bool> docker_busy: false;
+    property <bool> docker_expanded: false;
     in property <string> home_text: "";
     in property <string> add_text: "";
     in property <string> usb_text: "";
@@ -31,6 +35,13 @@ export component Sidebar inherits Rectangle {
     callback tab_selected(int);
     callback home_clicked();
     callback toggle_collapsed();
+    callback docker_selected(int);
+    changed selected_tab => {
+        if root.selected_tab == 9 { root.docker_expanded = true; }
+    }
+    changed docker_expanded => {
+        navigation.viewport-y = root.docker_expanded ? min(0px, navigation.height - navigation.viewport-height) : 0px;
+    }
     width: collapsed ? 54px : 200px;
     background: Theme.sidebar_bg;
     animate width {
@@ -78,79 +89,140 @@ export component Sidebar inherits Rectangle {
             }
         }
 
-        SidebarItem {
-            icon: "\u{E80F}";
-            icon_type: "emerald";
-            text: root.home_text;
-            selected: selected_tab == 0;
-            collapsed: root.collapsed;
-            clicked => {
-                root.tab_selected(0);
-                root.home_clicked();
-            }
-        }
-
-        if (root.show_add): SidebarItem {
-            icon: "\u{E710}";
-            icon_type: "sky";
-            text: root.add_text;
-            selected: selected_tab == 1;
-            collapsed: root.collapsed;
-            clicked => {
-                root.tab_selected(1);
-            }
-        }
-        if (root.show_usb): SidebarItem {
-            icon: "\u{E88E}";
-            icon_type: "amber";
-            text: root.usb_text;
-            selected: selected_tab == 2;
-            collapsed: root.collapsed;
-            clicked => {
-                root.tab_selected(2);
-            }
-        }
-        if (root.show_network): SidebarItem {
-            icon: "\u{EE77}"; // Network icon
-            icon_type: "violet";
-            text: root.network_text;
-            selected: selected_tab == 3;
-            collapsed: root.collapsed;
-            clicked => {
-                root.tab_selected(3);
-            }
-        }
-        if (root.show_scheduler): SidebarItem {
-            icon: "\u{E917}"; // Clock icon
-            icon_type: "orange";
-            text: root.scheduler_text;
-            selected: selected_tab == 4;
-            collapsed: root.collapsed;
-            clicked => {
-                root.tab_selected(4);
-            }
-        }
-        if (root.show_mount): SidebarItem {
-            icon: "\u{e772}"; // Hard drive icon
-            icon_type: "sky";
-            text: root.mount_text;
-            selected: selected_tab == 5;
-            collapsed: root.collapsed;
-            clicked => {
-                root.tab_selected(5);
-            }
-        }
-        SidebarItem {
-            icon: "\u{E7B8}";
-            icon_type: "sky";
-            text: "Docker";
-            selected: selected_tab == 9;
-            collapsed: root.collapsed;
-            clicked => { root.tab_selected(9); }
-        }
         Rectangle {
             vertical-stretch: 1;
-        } // Spacer: Pushes everything below it to the bottom
+            min-height: 0px;
+            clip: !root.collapsed;
+            navigation := Flickable {
+                width: parent.width;
+                height: parent.height;
+                viewport-width: self.width;
+                viewport-height: navigation_items.preferred-height;
+                navigation_items := VerticalLayout {
+                    width: parent.width;
+                    spacing: 4px;
+                    SidebarItem {
+                        icon: "\u{E80F}";
+                        icon_type: "emerald";
+                        text: root.home_text;
+                        selected: selected_tab == 0;
+                        collapsed: root.collapsed;
+                        clicked => {
+                            root.tab_selected(0);
+                            root.home_clicked();
+                        }
+                    }
+
+                    if (root.show_add): SidebarItem {
+                        icon: "\u{E710}";
+                        icon_type: "sky";
+                        text: root.add_text;
+                        selected: selected_tab == 1;
+                        collapsed: root.collapsed;
+                        clicked => {
+                            root.tab_selected(1);
+                        }
+                    }
+                    if (root.show_usb): SidebarItem {
+                        icon: "\u{E88E}";
+                        icon_type: "amber";
+                        text: root.usb_text;
+                        selected: selected_tab == 2;
+                        collapsed: root.collapsed;
+                        clicked => {
+                            root.tab_selected(2);
+                        }
+                    }
+                    if (root.show_network): SidebarItem {
+                        icon: "\u{EE77}"; // Network icon
+                        icon_type: "violet";
+                        text: root.network_text;
+                        selected: selected_tab == 3;
+                        collapsed: root.collapsed;
+                        clicked => {
+                            root.tab_selected(3);
+                        }
+                    }
+                    if (root.show_scheduler): SidebarItem {
+                        icon: "\u{E917}"; // Clock icon
+                        icon_type: "orange";
+                        text: root.scheduler_text;
+                        selected: selected_tab == 4;
+                        collapsed: root.collapsed;
+                        clicked => {
+                            root.tab_selected(4);
+                        }
+                    }
+                    if (root.show_mount): SidebarItem {
+                        icon: "\u{e772}"; // Hard drive icon
+                        icon_type: "sky";
+                        text: root.mount_text;
+                        selected: selected_tab == 5;
+                        collapsed: root.collapsed;
+                        clicked => {
+                            root.tab_selected(5);
+                        }
+                    }
+                    SidebarItem {
+                        icon: "\u{E7B8}";
+                        icon_type: "sky";
+                        text: "Docker";
+                        selected: selected_tab == 9;
+                        collapsed: root.collapsed;
+                        clicked => {
+                            if root.collapsed {
+                                root.collapsed = false;
+                                root.toggle_collapsed();
+                                root.docker_expanded = true;
+                            } else if root.selected_tab == 9 {
+                                root.docker_expanded = !root.docker_expanded;
+                            } else {
+                                root.docker_expanded = true;
+                            }
+                            root.tab_selected(9);
+                        }
+                        if !root.collapsed: Path {
+                            x: AppI18n.is-rtl ? 12px : parent.width - 24px;
+                            y: (parent.height - 6px) / 2;
+                            width: 10px;
+                            height: 6px;
+                            z: 1;
+                            commands: root.docker_expanded ? "M 1 1 L 5 5 L 9 1" :
+                                AppI18n.is-rtl ? "M 7 0 L 3 3 L 7 6" : "M 3 0 L 7 3 L 3 6";
+                            fill: transparent;
+                            stroke: Theme.text_secondary;
+                            stroke-width: 1.5px;
+                        }
+                    }
+                    if root.docker_expanded && !root.collapsed: VerticalLayout {
+                        spacing: 2px;
+                        for label[index] in ["docker.containers", "docker.images", "docker.compose"]: HorizontalLayout {
+                            height: 32px;
+                            padding-left: AppI18n.is-rtl ? 0px : 20px;
+                            padding-right: AppI18n.is-rtl ? 20px : 0px;
+                            SidebarItem {
+                                height: 32px;
+                                text: AppI18n.t(label, [AppI18n.version]);
+                                icon: "";
+                                selected: root.selected_tab == 9 && root.docker_section == index;
+                                opacity: root.docker_busy ? 0.6 : 1;
+                                clicked => { if !root.docker_busy { root.docker_selected(index); } }
+                            }
+                        }
+                    }
+                }
+            }
+            CustomScrollbar {
+                visible: navigation.viewport-height > navigation.height;
+                x: AppI18n.is-rtl ? 0px : parent.width - 4px;
+                width: 4px;
+                height: 100%;
+                maximum: max(0px, navigation.viewport-height - navigation.height);
+                page_size: navigation.height;
+                value: -navigation.viewport-y;
+                scroll_to(v) => { navigation.viewport-y = -v; }
+            }
+        }
         
         // Group of bottom items
         Rectangle {

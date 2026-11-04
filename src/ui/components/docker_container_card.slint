@@ -144,6 +144,11 @@ export component DockerContainerCard inherits Rectangle {
         if root.expanded: VerticalLayout {
             spacing: 6px;
             Rectangle { height: 1px; background: Theme.border_color; }
+            if root.container.state == "running": CustomButton {
+                text: AppI18n.t("docker.monitor", [AppI18n.version]);
+                enabled: root.enabled;
+                clicked => { root.action("stats", root.container.id); }
+            }
             CopyRow {
                 label: AppI18n.t("docker.name", [AppI18n.version]);
                 value: root.container.name;

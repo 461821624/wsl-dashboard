@@ -10,6 +10,10 @@ use tokio::process::Command;
 
 const MAX_OUTPUT: u64 = 1024 * 1024;
 
+#[path = "docker/resources.rs"]
+mod resources;
+pub use resources::{Image, normalize_pull_source, projects, resolve_pull_reference};
+
 pub fn matches_filter(name: &str, image: &str, state: &str, query: &str, filter: i32) -> bool {
     let state_matches = match filter {
         0 => true,
@@ -53,6 +57,10 @@ pub struct Container {
     pub status: String,
     #[serde(rename = "Ports")]
     pub ports: String,
+    #[serde(rename = "Project", default)]
+    pub project: String,
+    #[serde(rename = "Service", default)]
+    pub service: String,
 }
 
 fn valid_id(id: &str) -> bool {
@@ -81,6 +89,15 @@ fn action_args(action: &str, id: &str) -> Result<Vec<String>, String> {
     let args = match action {
         "start" | "stop" | "restart" => vec![action, "--", id],
         "logs" => vec!["logs", "--tail", "200", "--timestamps", "--", id],
+        "stats" => vec![
+            "stats",
+            "--no-stream",
+            "--no-trunc",
+            "--format",
+            "{{json .}}",
+            "--",
+            id,
+        ],
         _ => return Err(i18n::t("docker.invalid_action")),
     };
     Ok(args.into_iter().map(str::to_owned).collect())
@@ -142,6 +159,14 @@ impl Target {
     }
 
     async fn run(&self, args: &[String]) -> Result<(String, String), String> {
+        self.run_with_timeout(args, Duration::from_secs(45)).await
+    }
+
+    async fn run_with_timeout(
+        &self,
+        args: &[String],
+        timeout: Duration,
+    ) -> Result<(String, String), String> {
         let mut command = self.command(args);
         let execute = async {
             let mut child = command
@@ -165,9 +190,13 @@ impl Target {
             }
             Ok((stdout, stderr))
         };
-        tokio::time::timeout(Duration::from_secs(45), execute)
-            .await
-            .map_err(|_| i18n::t("docker.timeout"))?
+        tokio::time::timeout(timeout, execute).await.map_err(|_| {
+            i18n::t(if timeout.as_secs() > 45 {
+                "docker.pull_timeout"
+            } else {
+                "docker.timeout"
+            })
+        })?
     }
 
     pub async fn list(&self) -> Result<(String, Vec<Container>), String> {
@@ -186,7 +215,10 @@ impl Target {
                 "--all".into(),
                 "--no-trunc".into(),
                 "--format".into(),
-                "{{json .}}".into(),
+                concat!(
+                    r#"{"ID":{{json .ID}},"Names":{{json .Names}},"Image":{{json .Image}},"State":{{json .State}},"Status":{{json .Status}},"Ports":{{json .Ports}},"#,
+                    r#""Project":{{json (.Label "com.docker.compose.project")}},"Service":{{json (.Label "com.docker.compose.service")}}}"#,
+                ).into(),
             ])
             .await?;
         Ok((version.trim().to_owned(), parse_containers(&output)?))
@@ -282,6 +314,18 @@ mod tests {
         assert_eq!(
             action_args("logs", &id).unwrap(),
             ["logs", "--tail", "200", "--timestamps", "--", &id]
+        );
+        assert_eq!(
+            action_args("stats", &id).unwrap(),
+            [
+                "stats",
+                "--no-stream",
+                "--no-trunc",
+                "--format",
+                "{{json .}}",
+                "--",
+                &id
+            ]
         );
     }
 

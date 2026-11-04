@@ -594,6 +594,8 @@ mod tests {
             hide_pin: false,
             show_drag: true,
             mount_auto_probe: false,
+            docker_pull_source: String::new(),
+            docker_pull_sources: Vec::new(),
         };
 
         // Verify TOML round-trip with serde

@@ -968,6 +968,7 @@ pub async fn load_settings_to_ui(app: &AppWindow, app_state: &Arc<Mutex<AppState
     let sparse_vhd = crate::utils::wsl_config::get_sparse_vhd();
     app.set_sparse_vhd(sparse_vhd);
     app.set_mount_auto_probe(settings.mount_auto_probe);
+    crate::ui::handlers::docker::set_pull_sources(app, settings.docker_pull_sources.clone(), settings.docker_pull_source.clone());
 
     debug!("Configuration loaded to UI (Language: {}, Mode: {}, LogLevel: {}, LogDays: {})", 
           settings.ui_language, if settings.dark_mode { "Dark" } else { "Light" }, settings.log_level, log_days);

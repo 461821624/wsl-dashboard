@@ -1,0 +1,82 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme, AppI18n, LayoutConstants, DockerResource } from "../theme.slint";
+import { CustomButton } from "form_widgets.slint";
+
+export component DockerResourceCard inherits Rectangle {
+    in property <DockerResource> resource;
+    in property <int> section;
+    in property <bool> enabled;
+    in property <bool> expanded;
+    callback action(string, string);
+    callback toggle_details();
+    callback copy_text(string);
+    background: Theme.card_bg;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: Theme.border_color;
+    height: card.preferred-height;
+    card := VerticalLayout {
+        padding: 10px;
+        spacing: 6px;
+        Text {
+            text: root.resource.name;
+            color: Theme.text_primary;
+            font-family: Theme.default_font;
+            font-size: 14px * LayoutConstants.font-scale;
+            font-weight: 600;
+            overflow: elide;
+            wrap: no-wrap;
+        }
+        Text {
+            text: root.resource.summary;
+            color: Theme.text_secondary;
+            font-family: Theme.default_font;
+            font-size: 12px * LayoutConstants.font-scale;
+            overflow: elide;
+            wrap: no-wrap;
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: start;
+            if root.section == 1: CustomButton {
+                text: AppI18n.t("docker.remove_image", [AppI18n.version]);
+                enabled: root.enabled && !root.resource.in_use;
+                clicked => { root.action("remove", root.resource.id); }
+            }
+            if root.section == 2 && root.resource.running < root.resource.total: CustomButton {
+                text: AppI18n.t("docker.start", [AppI18n.version]);
+                enabled: root.enabled;
+                clicked => { root.action("project-start", root.resource.id); }
+            }
+            if root.section == 2 && root.resource.running > 0: CustomButton {
+                text: AppI18n.t("docker.stop", [AppI18n.version]);
+                enabled: root.enabled;
+                clicked => { root.action("project-stop", root.resource.id); }
+            }
+            if root.section == 2: CustomButton {
+                text: AppI18n.t("docker.logs_button", [AppI18n.version]);
+                enabled: root.enabled;
+                clicked => { root.action("project-logs", root.resource.id); }
+            }
+            CustomButton {
+                text: AppI18n.t(root.expanded ? "docker.collapse" : "docker.details", [AppI18n.version]);
+                clicked => { root.toggle_details(); }
+            }
+        }
+        if root.expanded: VerticalLayout {
+            spacing: 6px;
+            Text {
+                text: root.resource.details;
+                color: Theme.text_primary;
+                font-family: Theme.default_font;
+                font-size: 12px * LayoutConstants.font-scale;
+                wrap: word-wrap;
+            }
+            CustomButton {
+                text: AppI18n.t("docker.copy", [AppI18n.version]);
+                clicked => { root.copy_text(root.resource.details); }
+            }
+        }
+    }
+}

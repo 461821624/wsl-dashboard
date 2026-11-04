@@ -2,15 +2,30 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { TextEdit } from "std-widgets.slint";
-import { Theme, AppI18n, LayoutConstants, DockerContainer } from "../theme.slint";
+import { Theme, AppI18n, LayoutConstants, DockerContainer, DockerResource } from "../theme.slint";
 import { CustomButton, CustomComboBox, CustomCheckBox, CustomLineEdit } from "../components/form_widgets.slint";
 import { CustomScrollbar } from "../components/scrollbar.slint";
 import { DockerContainerCard } from "../components/docker_container_card.slint";
+import { DockerResourceCard } from "../components/docker_resource_card.slint";
 
 export component DockerView inherits Rectangle {
     in property <[string]> targets;
     in property <int> target_index;
     in property <[DockerContainer]> containers;
+    in property <[DockerResource]> resources;
+    in property <int> resource_count;
+    in property <int> section;
+    in-out property <string> pull_reference;
+    in-out property <string> pull_source;
+    in property <string> saved_pull_source;
+    in property <[string]> pull_sources;
+    in-out property <int> pull_source_index;
+    in property <string> pull_source_error;
+    in property <string> pull_target;
+    in property <string> pull_error;
+    callback preview_pull();
+    callback source_action(string, string);
+    callback resource_action(string, string);
     in property <int> total_count;
     in property <bool> busy;
     in property <string> busy_id;
@@ -84,15 +99,104 @@ export component DockerView inherits Rectangle {
             font-size: 11px * LayoutConstants.font-scale;
             wrap: word-wrap;
         }
+        if root.section == 1: VerticalLayout {
+            spacing: 6px;
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: AppI18n.t("docker.pull_source", [AppI18n.version]);
+                    color: Theme.text_primary;
+                    font-family: Theme.default_font;
+                    font-size: 12px * LayoutConstants.font-scale;
+                    vertical-alignment: center;
+                }
+                CustomComboBox {
+                    horizontal-stretch: 1;
+                    model: root.pull_sources;
+                    current-index <=> root.pull_source_index;
+                    enabled: !root.busy;
+                    selected(index) => { root.source_action("select", index == 0 ? "" : root.pull_sources[index]); }
+                }
+                CustomButton {
+                    text: AppI18n.t("docker.remove_pull_source", [AppI18n.version]);
+                    enabled: !root.busy && root.saved_pull_source != "";
+                    clicked => { root.source_action("remove", root.saved_pull_source); }
+                }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                CustomLineEdit {
+                    text <=> root.pull_source;
+                    placeholder-text: AppI18n.t("docker.pull_source_placeholder", [AppI18n.version]);
+                    horizontal-stretch: 1;
+                    enabled: !root.busy;
+                }
+                CustomButton {
+                    text: AppI18n.t("docker.add_pull_source", [AppI18n.version]);
+                    enabled: !root.busy && root.pull_source != "";
+                    clicked => { root.source_action("add", root.pull_source); }
+                }
+            }
+            Text {
+                text: AppI18n.t("docker.pull_source_hint", [AppI18n.version]);
+                color: Theme.text_secondary;
+                font-family: Theme.default_font;
+                font-size: 11px * LayoutConstants.font-scale;
+                wrap: word-wrap;
+            }
+            if root.pull_source_error != "": Text {
+                text: root.pull_source_error;
+                color: Theme.icon_color_warning;
+                font-family: Theme.default_font;
+                font-size: 12px * LayoutConstants.font-scale;
+                wrap: word-wrap;
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                CustomLineEdit {
+                    text <=> root.pull_reference;
+                    placeholder-text: "nginx:latest / ghcr.io/org/image:tag";
+                    horizontal-stretch: 1;
+                    enabled: !root.busy;
+                    edited(text) => { root.preview_pull(); }
+                }
+                CustomButton {
+                    text: AppI18n.t("docker.pull", [AppI18n.version]);
+                    enabled: !root.busy && root.error == "" && root.pull_reference != "" && root.pull_error == "";
+                    clicked => { root.resource_action("pull", root.pull_reference); }
+                }
+            }
+            if root.pull_target != "": Text {
+                text: AppI18n.t("docker.pull_target", [AppI18n.version]) + ": " + root.pull_target;
+                color: Theme.text_secondary;
+                font-family: Theme.default_font;
+                font-size: 11px * LayoutConstants.font-scale;
+                wrap: word-wrap;
+            }
+            if root.pull_error != "": Text {
+                text: root.pull_error;
+                color: Theme.icon_color_warning;
+                font-family: Theme.default_font;
+                font-size: 12px * LayoutConstants.font-scale;
+                wrap: word-wrap;
+            }
+        }
+        if root.section == 2: Text {
+            text: AppI18n.t("docker.compose_hint", [AppI18n.version]);
+            color: Theme.text_secondary;
+            font-family: Theme.default_font;
+            font-size: 11px * LayoutConstants.font-scale;
+            wrap: word-wrap;
+        }
         HorizontalLayout {
             spacing: 8px;
             CustomLineEdit {
                 horizontal-stretch: 1;
                 text <=> root.query;
-                placeholder-text: AppI18n.t("docker.search", [AppI18n.version]);
+                placeholder-text: AppI18n.t(root.section == 0 ? "docker.search" : "docker.search_resources", [AppI18n.version]);
                 edited(text) => { root.filter_changed(); }
             }
-            CustomComboBox {
+            if root.section == 0: CustomComboBox {
                 width: 140px;
                 model: [
                     AppI18n.t("docker.filter_all", [AppI18n.version]),
@@ -129,7 +233,7 @@ export component DockerView inherits Rectangle {
                     width: parent.width;
                     padding: 0px;
                     spacing: 8px;
-                    for container in root.containers: DockerContainerCard {
+                    for container in (root.section == 0 ? root.containers : []): DockerContainerCard {
                         container: container;
                         enabled: !root.busy && root.error == "";
                         expanded: root.expanded_id == container.id;
@@ -140,8 +244,17 @@ export component DockerView inherits Rectangle {
                         }
                         copy_text(text) => { root.copy_text(text); }
                     }
-                    if root.containers.length == 0 && !root.busy && root.error == "": Text {
-                        text: AppI18n.t(root.total_count == 0 ? "docker.no_containers" : "docker.no_results", [AppI18n.version]);
+                    for resource in (root.section != 0 ? root.resources : []): DockerResourceCard {
+                        resource: resource;
+                        section: root.section;
+                        enabled: !root.busy && root.error == "";
+                        expanded: root.expanded_id == resource.id;
+                        toggle_details => { root.expanded_id = root.expanded_id == resource.id ? "" : resource.id; }
+                        action(action, id) => { root.resource_action(action, id); }
+                        copy_text(text) => { root.copy_text(text); }
+                    }
+                    if (root.section == 0 ? root.containers.length == 0 : root.resources.length == 0) && !root.busy && root.error == "": Text {
+                        text: AppI18n.t(root.section == 0 ? (root.total_count == 0 ? "docker.no_containers" : "docker.no_results") : (root.resource_count == 0 ? "docker.no_resources" : "docker.no_resource_results"), [AppI18n.version]);
                         color: Theme.text_secondary;
                         font-family: Theme.default_font;
                         font-size: 13px * LayoutConstants.font-scale;

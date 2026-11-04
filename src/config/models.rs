@@ -75,6 +75,10 @@ pub struct UserSettings {
     pub show_drag: bool,
     #[serde(rename = "mount-auto-probe", default)]
     pub mount_auto_probe: bool,
+    #[serde(rename = "docker-pull-source", default)]
+    pub docker_pull_source: String,
+    #[serde(rename = "docker-pull-sources", default)]
+    pub docker_pull_sources: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -178,6 +182,8 @@ impl Config {
                 hide_pin: false,
                 show_drag: true,
                 mount_auto_probe: false,
+                docker_pull_source: String::new(),
+                docker_pull_sources: Vec::new(),
             },
 
             tray: TraySettings::default(),
@@ -393,5 +399,36 @@ impl InstancesContainer {
             last_distros: Vec::new(),
             instances: std::collections::HashMap::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod docker_pull_source_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_settings_default_to_no_custom_pull_source() {
+        let settings = Config::default().settings;
+        let mut value = toml::Value::try_from(&settings).unwrap();
+        value.as_table_mut().unwrap().remove("docker-pull-source");
+        value.as_table_mut().unwrap().remove("docker-pull-sources");
+        let loaded: UserSettings = value.try_into().unwrap();
+        assert!(loaded.docker_pull_source.is_empty());
+        assert!(loaded.docker_pull_sources.is_empty());
+    }
+
+    #[test]
+    fn custom_pull_source_survives_settings_roundtrip() {
+        let mut settings = Config::default().settings;
+        settings.docker_pull_source = "mirror.example.com/cache".to_owned();
+        settings.docker_pull_sources = vec!["mirror.example.com/cache".to_owned(), "localhost:5000".to_owned()];
+        let text = toml::to_string_pretty(&settings).unwrap();
+        assert!(text.contains("docker-pull-source"));
+        let loaded: UserSettings = toml::from_str(&text).unwrap();
+        assert_eq!(loaded.docker_pull_source, settings.docker_pull_source);
+        assert_eq!(loaded.docker_pull_sources, settings.docker_pull_sources);
+        settings.docker_pull_source.clear();
+        let cleared: UserSettings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
+        assert!(cleared.docker_pull_source.is_empty());
     }
 }

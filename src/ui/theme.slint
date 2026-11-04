@@ -12,6 +12,16 @@ export struct DockerContainer {
     ports: string,
 }
 
+export struct DockerResource {
+    id: string,
+    name: string,
+    summary: string,
+    details: string,
+    in_use: bool,
+    running: int,
+    total: int,
+}
+
 export global AppApi {
     in-out property <bool> show_drag: true;
     pure callback make-transfer(int) -> data-transfer;
