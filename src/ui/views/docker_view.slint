@@ -16,15 +16,13 @@ export component DockerView inherits Rectangle {
     in property <int> resource_count;
     in property <int> section;
     in-out property <string> pull_reference;
-    in-out property <string> pull_source;
-    in property <string> saved_pull_source;
     in property <[string]> pull_sources;
     in-out property <int> pull_source_index;
-    in property <string> pull_source_error;
     in property <string> pull_target;
     in property <string> pull_error;
     callback preview_pull();
     callback source_action(string, string);
+    callback manage_sources();
     callback resource_action(string, string);
     in property <int> total_count;
     in property <bool> busy;
@@ -115,40 +113,19 @@ export component DockerView inherits Rectangle {
                     model: root.pull_sources;
                     current-index <=> root.pull_source_index;
                     enabled: !root.busy;
-                    selected(index) => { root.source_action("select", index == 0 ? "" : root.pull_sources[index]); }
+                    selected(index) => { root.source_action("use", index == 0 ? "" : root.pull_sources[index]); }
                 }
                 CustomButton {
-                    text: AppI18n.t("docker.remove_pull_source", [AppI18n.version]);
-                    enabled: !root.busy && root.saved_pull_source != "";
-                    clicked => { root.source_action("remove", root.saved_pull_source); }
-                }
-            }
-            HorizontalLayout {
-                spacing: 8px;
-                CustomLineEdit {
-                    text <=> root.pull_source;
-                    placeholder-text: AppI18n.t("docker.pull_source_placeholder", [AppI18n.version]);
-                    horizontal-stretch: 1;
+                    text: AppI18n.t("docker.manage_pull_sources", [AppI18n.version]);
                     enabled: !root.busy;
-                }
-                CustomButton {
-                    text: AppI18n.t("docker.add_pull_source", [AppI18n.version]);
-                    enabled: !root.busy && root.pull_source != "";
-                    clicked => { root.source_action("add", root.pull_source); }
+                    clicked => { root.manage_sources(); }
                 }
             }
             Text {
-                text: AppI18n.t("docker.pull_source_hint", [AppI18n.version]);
+                text: AppI18n.t("docker.session_pull_source_hint", [AppI18n.version]);
                 color: Theme.text_secondary;
                 font-family: Theme.default_font;
                 font-size: 11px * LayoutConstants.font-scale;
-                wrap: word-wrap;
-            }
-            if root.pull_source_error != "": Text {
-                text: root.pull_source_error;
-                color: Theme.icon_color_warning;
-                font-family: Theme.default_font;
-                font-size: 12px * LayoutConstants.font-scale;
                 wrap: word-wrap;
             }
             HorizontalLayout {

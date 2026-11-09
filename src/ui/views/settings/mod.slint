@@ -3,6 +3,7 @@
 
 import { Theme, AppI18n, SettingsStrings, LayoutConstants, ShortcutRow } from "../../theme.slint";
 import { ShortcutSettingsSection } from "shortcut_tab.slint";
+import { DockerSettingsSection } from "docker_tab.slint";
 import { CustomScrollbar } from "../../components/scrollbar.slint";
 import { LanguageData } from "../../components/language_data.slint";
 import { 
@@ -94,7 +95,15 @@ export component SettingsView inherits Rectangle {
     in property <string> shortcut_conflict_text: "";
     in property <bool> shortcut_can_add: false;
 
-    property <int> active_tab: 0;
+    in-out property <int> active_tab: 0;
+    in-out property <string> docker_pull_source;
+    in property <string> docker_saved_pull_source;
+    in property <[string]> docker_pull_sources;
+    in-out property <int> docker_pull_source_index;
+    in property <string> docker_pull_source_error;
+    in property <string> docker_pull_source_notice;
+    in property <bool> docker_busy;
+    callback docker_source_action(string, string);
     in-out property <bool> show_language_dialog: false;
 
     // Options Models
@@ -196,6 +205,7 @@ export component SettingsView inherits Rectangle {
             spacing: 4px;
             alignment: AppI18n.is-rtl ? end : start;
 
+            if (AppI18n.is-rtl): SettingsTab { text: "Docker"; active: root.active_tab == 4; clicked => { root.active_tab = 4; } }
             if (AppI18n.is-rtl): SettingsTab { text: root.strings.tab_shortcuts; active: root.active_tab == 3; clicked => { root.active_tab = 3; } }
             if (AppI18n.is-rtl): SettingsTab { text: root.strings.tab_interface; active: root.active_tab == 2; clicked => { root.active_tab = 2; } }
             if (AppI18n.is-rtl): SettingsTab { text: root.strings.tab_advanced; active: root.active_tab == 1; clicked => { root.active_tab = 1; } }
@@ -205,6 +215,7 @@ export component SettingsView inherits Rectangle {
             if (!AppI18n.is-rtl): SettingsTab { text: root.strings.tab_advanced; active: root.active_tab == 1; clicked => { root.active_tab = 1; } }
             if (!AppI18n.is-rtl): SettingsTab { text: root.strings.tab_interface; active: root.active_tab == 2; clicked => { root.active_tab = 2; } }
             if (!AppI18n.is-rtl): SettingsTab { text: root.strings.tab_shortcuts; active: root.active_tab == 3; clicked => { root.active_tab = 3; } }
+            if (!AppI18n.is-rtl): SettingsTab { text: "Docker"; active: root.active_tab == 4; clicked => { root.active_tab = 4; } }
         }
 
         // Divider
@@ -323,6 +334,34 @@ export component SettingsView inherits Rectangle {
                 }
             }
 
+            if (root.active_tab == 4): Rectangle {
+                x: 0px; y: 0px;
+                width: tab-content.width;
+                height: tab-content.height;
+                clip: true;
+                flickable-docker := Flickable {
+                    viewport-height: docker-layout.preferred-height; width: parent.width; height: 100%;
+                    docker-layout := VerticalLayout {
+                        padding-left: AppI18n.is-rtl ? 16px : 4px; padding-right: AppI18n.is-rtl ? 4px : 16px; padding-top: 14px; padding-bottom: 14px;
+                        DockerSettingsSection {
+                            pull_source <=> root.docker_pull_source;
+                            saved_pull_source: root.docker_saved_pull_source;
+                            pull_sources: root.docker_pull_sources;
+                            pull_source_index <=> root.docker_pull_source_index;
+                            error: root.docker_pull_source_error;
+                            notice: root.docker_pull_source_notice;
+                            busy: root.docker_busy;
+                            source_action(operation, value) => { root.docker_source_action(operation, value); }
+                        }
+                    }
+                }
+                if (flickable-docker.viewport-height > flickable-docker.height): CustomScrollbar {
+                    x: AppI18n.is-rtl ? 4px : parent.width - 10px; y: 0; width: 8px; height: 100%;
+                    maximum: flickable-docker.viewport-height - flickable-docker.height; page_size: flickable-docker.height;
+                    value: -flickable-docker.viewport-y; scroll_to(v) => { flickable-docker.viewport-y = -v; }
+                }
+            }
+
             if (root.active_tab == 3): Rectangle {
                 x: 0px; y: 0px;
                 width: tab-content.width;
@@ -372,7 +411,7 @@ export component SettingsView inherits Rectangle {
             padding-right: AppI18n.is-rtl ? 4px : 16px;
             spacing: 8px;
 
-            if (AppI18n.is-rtl && root.active_tab != 3): CustomButton {
+            if (AppI18n.is-rtl && root.active_tab < 3): CustomButton {
                 text: root.strings.save; primary: true; height: 32px; width: 80px;
                 clicked => {
                     if (root.active_tab == 0) { root.save_general_settings(); }
@@ -405,7 +444,7 @@ export component SettingsView inherits Rectangle {
 
             if (!AppI18n.is-rtl): Rectangle { horizontal-stretch: 1; }
 
-            if (!AppI18n.is-rtl && root.active_tab != 3): CustomButton {
+            if (!AppI18n.is-rtl && root.active_tab < 3): CustomButton {
                 text: root.strings.save; primary: true; height: 32px; width: 80px;
                 clicked => {
                     if (root.active_tab == 0) { root.save_general_settings(); }

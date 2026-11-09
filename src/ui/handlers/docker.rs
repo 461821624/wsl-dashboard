@@ -39,6 +39,8 @@ pub fn set_pull_sources(app: &AppWindow, mut sources: Vec<String>, current: Stri
     choices.extend(sources.into_iter().map(slint::SharedString::from));
     app.set_docker_pull_sources(ModelRc::new(VecModel::from(choices)));
     app.set_docker_pull_source_index(index as i32);
+    app.set_docker_default_pull_source_index(index as i32);
+    app.set_docker_active_pull_source(current.clone().into());
     app.set_docker_saved_pull_source(current.into());
 }
 

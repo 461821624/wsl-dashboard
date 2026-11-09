@@ -1,0 +1,88 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Theme, AppI18n, LayoutConstants } from "../../theme.slint";
+import { CustomButton, CustomComboBox, CustomLineEdit } from "../../components/form_widgets.slint";
+
+export component DockerSettingsSection inherits VerticalLayout {
+    in-out property <string> pull_source;
+    in property <string> saved_pull_source;
+    in property <[string]> pull_sources;
+    in-out property <int> pull_source_index;
+    in property <string> error;
+    in property <string> notice;
+    in property <bool> busy;
+    callback source_action(string, string);
+    spacing: 12px;
+
+    Text {
+        text: AppI18n.t("docker.pull_source_settings_title", [AppI18n.version]);
+        color: Theme.text_primary;
+        font-family: Theme.default_font;
+        font-size: 15px * LayoutConstants.font-scale;
+        font-weight: 600;
+    }
+    Text {
+        text: AppI18n.t("docker.pull_source_hint", [AppI18n.version]);
+        color: Theme.text_secondary;
+        font-family: Theme.default_font;
+        font-size: 12px * LayoutConstants.font-scale;
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: AppI18n.t("docker.default_source_label", [AppI18n.version]);
+            color: Theme.text_primary;
+            font-family: Theme.default_font;
+            font-size: 13px * LayoutConstants.font-scale;
+            vertical-alignment: center;
+        }
+        CustomComboBox {
+            horizontal-stretch: 1;
+            model: root.pull_sources;
+            current-index <=> root.pull_source_index;
+            enabled: !root.busy;
+            selected(index) => { root.source_action("select", index == 0 ? "" : root.pull_sources[index]); }
+        }
+        CustomButton {
+            text: AppI18n.t("docker.remove_pull_source", [AppI18n.version]);
+            enabled: !root.busy && root.saved_pull_source != "";
+            clicked => { root.source_action("remove", root.saved_pull_source); }
+        }
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        CustomLineEdit {
+            text <=> root.pull_source;
+            placeholder-text: AppI18n.t("docker.pull_source_placeholder", [AppI18n.version]);
+            horizontal-stretch: 1;
+            enabled: !root.busy;
+        }
+        CustomButton {
+            text: AppI18n.t("docker.add_pull_source", [AppI18n.version]);
+            enabled: !root.busy && root.pull_source != "";
+            clicked => { root.source_action("add", root.pull_source); }
+        }
+    }
+    Text {
+        text: AppI18n.t("docker.pull_source_settings_hint", [AppI18n.version]);
+        color: Theme.text_secondary;
+        font-family: Theme.default_font;
+        font-size: 12px * LayoutConstants.font-scale;
+        wrap: word-wrap;
+    }
+    if root.error != "": Text {
+        text: root.error;
+        color: Theme.icon_color_warning;
+        font-family: Theme.default_font;
+        font-size: 12px * LayoutConstants.font-scale;
+        wrap: word-wrap;
+    }
+    if root.busy || root.notice != "": Text {
+        text: root.busy ? AppI18n.t("docker.loading", [AppI18n.version]) : root.notice;
+        color: Theme.text_secondary;
+        font-family: Theme.default_font;
+        font-size: 12px * LayoutConstants.font-scale;
+        wrap: word-wrap;
+    }
+}

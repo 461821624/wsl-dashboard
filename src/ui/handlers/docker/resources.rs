@@ -165,7 +165,7 @@ fn action(app: &AppWindow, ah: slint::Weak<AppWindow>, operation: &str, id: &str
     app.set_docker_notice("".into());
     let operation = operation.to_owned();
     let id = id.to_owned();
-    let source = app.get_docker_saved_pull_source().to_string();
+    let source = app.get_docker_active_pull_source().to_string();
     tokio::spawn(async move {
         let result = match operation.as_str() {
             "pull" => target
@@ -218,7 +218,7 @@ pub(super) fn setup(
     let handle = ah.clone();
     app.on_preview_docker_pull(move || {
         let Some(app) = handle.upgrade() else { return };
-        let source = app.get_docker_saved_pull_source();
+        let source = app.get_docker_active_pull_source();
         let reference = app.get_docker_pull_reference();
         let result = if reference.trim().is_empty() {
             normalize_pull_source(&source).map(|_| String::new())
@@ -242,6 +242,12 @@ pub(super) fn setup(
         if app.get_docker_busy() {
             return;
         }
+        if operation == "use" {
+            app.set_docker_active_pull_source(value);
+            app.invoke_preview_docker_pull();
+            return;
+        }
+        app.set_docker_pull_source_notice("".into());
         let value = match operation.as_str() {
             "add" => match normalize_pull_source(&value) {
                 Ok(source) if !source.is_empty() => source,
@@ -298,7 +304,9 @@ pub(super) fn setup(
                         if operation == "add" {
                             app.set_docker_pull_source("".into());
                         }
-                        app.set_docker_notice(i18n::t("docker.pull_source_saved").into());
+                        app.set_docker_pull_source_notice(
+                            i18n::t("docker.pull_source_saved").into(),
+                        );
                         app.invoke_preview_docker_pull();
                     }
                     Err(error) => {
@@ -311,7 +319,7 @@ pub(super) fn setup(
                                 .position(|source| source == current)
                                 .unwrap_or(0)
                         };
-                        app.set_docker_pull_source_index(index as i32);
+                        app.set_docker_default_pull_source_index(index as i32);
                         app.set_docker_pull_source_error(
                             format!("{}: {error}", i18n::t("docker.pull_source_save_failed"))
                                 .into(),

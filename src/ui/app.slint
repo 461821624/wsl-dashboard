@@ -98,9 +98,13 @@ export component AppWindow inherits Window {
     in-out property <string> docker_pull_reference;
     in-out property <string> docker_pull_source;
     in property <string> docker_saved_pull_source;
+    in property <string> docker_active_pull_source;
     in property <[string]> docker_pull_sources;
     in-out property <int> docker_pull_source_index: 0;
+    in-out property <int> docker_default_pull_source_index: 0;
     in property <string> docker_pull_source_error;
+    in property <string> docker_pull_source_notice;
+    in-out property <int> settings_active_tab: 0;
     in property <string> docker_pull_target;
     in property <string> docker_pull_error;
     callback preview_docker_pull();
@@ -1030,15 +1034,16 @@ export component AppWindow inherits Window {
                                 resources: root.docker_filtered_resources;
                                 resource_count: root.docker_resources.length;
                                 pull_reference <=> root.docker_pull_reference;
-                                pull_source <=> root.docker_pull_source;
-                                saved_pull_source: root.docker_saved_pull_source;
                                 pull_sources: root.docker_pull_sources;
                                 pull_source_index <=> root.docker_pull_source_index;
-                                pull_source_error: root.docker_pull_source_error;
                                 pull_target: root.docker_pull_target;
                                 pull_error: root.docker_pull_error;
                                 preview_pull => { root.preview_docker_pull(); }
                                 source_action(operation, value) => { root.docker_pull_source_action(operation, value); }
+                                manage_sources => {
+                                    root.settings_active_tab = 4;
+                                    root.select_tab(7);
+                                }
                                 resource_action(action, id) => { root.docker_resource_action(action, id); }
                                 target_index: root.docker_target_index;
                                 containers: root.docker_filtered_containers;
@@ -1104,6 +1109,15 @@ export component AppWindow inherits Window {
                                 z: 6;
                                 x: selected_tab == 7 ? 0px : 10000px;
                                 strings: root.settings_strings;
+                                active_tab <=> root.settings_active_tab;
+                                docker_pull_source <=> root.docker_pull_source;
+                                docker_saved_pull_source: root.docker_saved_pull_source;
+                                docker_pull_sources: root.docker_pull_sources;
+                                docker_pull_source_index <=> root.docker_default_pull_source_index;
+                                docker_pull_source_error: root.docker_pull_source_error;
+                                docker_pull_source_notice: root.docker_pull_source_notice;
+                                docker_busy: root.docker_busy;
+                                docker_source_action(operation, value) => { root.docker_pull_source_action(operation, value); }
                                 show_language_dialog <=> root.show_language_dialog;
                                 language_selected(lang_code) => {
                                     root.ui_language = lang_code;

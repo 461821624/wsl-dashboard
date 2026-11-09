@@ -1,7 +1,12 @@
 [docker]
 pull_source = "Pull source"
 default_pull_source = "Docker default"
-add_pull_source = "Add & use"
+add_pull_source = "Add & set default"
+manage_pull_sources = "Manage sources"
+pull_source_settings_title = "Image pull sources"
+default_source_label = "Default source"
+pull_source_settings_hint = "Changes are saved automatically. The image page can select a source for this session; restarting restores this default."
+session_pull_source_hint = "This selection applies to the current session. Manage addresses and the default source in Settings."
 remove_pull_source = "Remove source"
 pull_source_placeholder = "Optional source: mirror.example.com[:port][/prefix]"
 pull_source_hint = "Only affects Docker Hub pulls in this tool. Other registries keep their address. Docker default uses the engine's existing configuration."

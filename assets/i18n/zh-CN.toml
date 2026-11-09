@@ -1,7 +1,12 @@
 [docker]
 pull_source = "拉取源"
 default_pull_source = "Docker 默认"
-add_pull_source = "添加并使用"
+add_pull_source = "添加并设为默认"
+manage_pull_sources = "管理源"
+pull_source_settings_title = "镜像拉取源"
+default_source_label = "默认拉取源"
+pull_source_settings_hint = "修改后自动保存。镜像页面可以临时切换源，重启应用后恢复这里的默认选择。"
+session_pull_source_hint = "此处切换仅对本次运行生效；默认源和地址列表可在设置中管理。"
 remove_pull_source = "移除源"
 pull_source_placeholder = "可选地址：mirror.example.com[:端口][/前缀]"
 pull_source_hint = "仅用于本工具拉取 Docker Hub 镜像，其他仓库保持原地址。选择 Docker 默认时沿用引擎现有配置。"
